@@ -271,7 +271,8 @@ void processpool< T >::run_child()
                     }
                     addfd( m_epollfd, connfd );
                     
-                    /* 模板类T必须实现init方法　以初始化一个客户端连接 
+                    /**
+                     * 模板类T必须实现init方法　以初始化一个客户端连接 
                      * 我们直接使用connfd来索引逻辑处理对象,以提高程序的运行效率 
                      * 但有一个问题就是有些浪费资源　hash_map获取会更好一些
                      */
@@ -279,8 +280,8 @@ void processpool< T >::run_child()
                 }
             }
 
-            /* 处理子进程收到信号
-             * 关于这块大家要小心处理
+            /** 
+             * 处理子进程收到信号
              * 因为父子进程会同时收到完全一样的信号
              */
             else if( ( sockfd == sig_pipefd[0] ) && ( events[i].events & EPOLLIN ) )
