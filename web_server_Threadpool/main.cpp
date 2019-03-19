@@ -1,3 +1,9 @@
+/**
+ * Created by 刘嘉辉 on 10/30/18.
+ * Copyright (c) 2018 刘嘉辉 All rights reserved.
+ * @brief To immplmente main.h.
+ */
+
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -124,7 +130,7 @@ int main( int argc, char* argv[] )
                 users[connfd].init( connfd, client_address );
             }
 
-            /*异常*/
+            /*异常事件 直接关闭 不做过多处理*/
             else if( events[i].events & ( EPOLLRDHUP | EPOLLHUP | EPOLLERR ) )
             {
                 users[sockfd].close_conn();
@@ -144,7 +150,7 @@ int main( int argc, char* argv[] )
                 }
             }
             
-            /*这个一会儿学习下　*/
+            /*内核缓冲区中发送空间不足 等待EPOLLOUT时间*/
             else if( events[i].events & EPOLLOUT )
             {
                 if( !users[sockfd].write() )
@@ -152,8 +158,6 @@ int main( int argc, char* argv[] )
                     users[sockfd].close_conn();
                 }
             }
-            else
-            {}
         }
     }
 
