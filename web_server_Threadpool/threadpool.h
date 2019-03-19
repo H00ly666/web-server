@@ -1,3 +1,9 @@
+/**
+ * Created by 刘嘉辉 on 10/22/18.
+ * Copyright (c) 2018 刘嘉辉 All rights reserved.
+ * @brief To immplmente process_pool.h.
+ */
+
 #ifndef THREADPOOL_H
 #define THREADPOOL_H
 
@@ -9,7 +15,6 @@
 
 
 /*线程池类，将它定义为模板类是为了代码复用。模板参数T是任务类*/
-/*今天听到有人说模板类只能放在头文件里*/
 template< typename T >
 class threadpool
 {
@@ -21,7 +26,7 @@ public:
     bool append( T* request );
 
 private:
-    /*工作线程运行的函数 它不断地从工农工作队列中取出任务并执行之*/
+    /*工作线程运行的函数 它不断地从工作队列中取出任务并执行之*/
     static void* worker( void* arg );
     void run();
 
@@ -60,13 +65,12 @@ threadpool< T >::threadpool( int thread_number, int max_requests ) :
     for ( int i = 0; i < thread_number; ++i )
     {
         printf( "create the %dth thread\n", i );
-        /*关于数据的传法这里比较有意思了 this　这个是将线程池的这个类整体传了进去*/
         if( pthread_create( m_threads + i, NULL, worker, this ) != 0 )
         {
             delete [] m_threads;
             throw std::exception();
         }
-        //脱离线程是什么意思呢
+        /*线程脱离 不用 pthread_join 手动回收*/
         if( pthread_detach( m_threads[i] ) )
         {
             delete [] m_threads;
@@ -75,7 +79,7 @@ threadpool< T >::threadpool( int thread_number, int max_requests ) :
     }
 }
 
-/*析构函数　释放那个资源*/
+/*释放线程资源*/
 template< typename T >
 threadpool< T >::~threadpool()
 {
@@ -89,7 +93,7 @@ bool threadpool< T >::append( T* request )
     /*上锁*/
     m_queuelocker.lock();
 
-    /*任务请求队列大于最大请求数　舍弃掉不需要再添加了*/
+    /*任务请求队列大于最大请求数　舍弃*/
     if ( m_workqueue.size() > m_max_requests )
     {
         m_queuelocker.unlock();
@@ -99,7 +103,6 @@ bool threadpool< T >::append( T* request )
     m_workqueue.push_back( request );
     m_queuelocker.unlock();
     
-    /**/
     m_queuestat.post();
     return true;
 }
@@ -122,27 +125,24 @@ void threadpool< T >::run()
     {
         /*是否有任务需要处理的信号量*/
         m_queuestat.wait();
-        /*枷锁*/
         m_queuelocker.lock();
+        
         if ( m_workqueue.empty() )
         {
-            /*空就不用取了嘛*/
             m_queuelocker.unlock();
             continue;
         }
 
         /*取出第一个任务来处理*/
         T* request = m_workqueue.front();
-        /*删除第一个*/
         m_workqueue.pop_front();
-        /*解锁*/
         m_queuelocker.unlock();
         if ( ! request )
         {
             /*可能为空*/
             continue;
         }
-        /*执行之*/
+        /*执行任务*/
         request->process();
     }
 }
