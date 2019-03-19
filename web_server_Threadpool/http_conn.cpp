@@ -1,6 +1,13 @@
+/**
+ * Created by 刘嘉辉 on 10/22/18.
+ * Copyright (c) 2018 刘嘉辉 All rights reserved.
+ * @brief To immplmente http_conn.cpp.
+ */
+
 #include "./http_conn.h"
 #include <unistd.h>
 
+/*HTTP的一些状态响应信息*/
 const char* ok_200_title = "OK";
 const char* error_400_title = "Bad Request";
 const char* error_400_form = "Your request has bad syntax or is inherently impossible to satisfy.\n";
@@ -12,6 +19,7 @@ const char* error_500_title = "Internal Error";
 const char* error_500_form = "There was an unusual problem serving the requested file.\n";
 const char* doc_root = "./var/www/html";
 
+/*设置非阻塞套接字*/
 int setnonblocking( int fd )
 {
     int old_option = fcntl( fd, F_GETFL );
@@ -54,14 +62,13 @@ void http_conn::close_conn( bool real_close )
 {
     if( real_close && ( m_sockfd != -1 ) )
     {
-        //modfd( m_epollfd, m_sockfd, EPOLLIN );
         removefd( m_epollfd, m_sockfd );
         m_sockfd = -1;
         m_user_count--;
     }
 }
 
-/*init 重载两次　此函数先进行连接的初始化*/
+/*init 重载*/
 void http_conn::init( int sockfd, const sockaddr_in& addr )
 {
     m_sockfd = sockfd;
@@ -73,7 +80,8 @@ void http_conn::init( int sockfd, const sockaddr_in& addr )
     setsockopt( m_sockfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof( reuse ) );
     addfd( m_epollfd, sockfd, true );
     m_user_count++;
-    /*调用下边的函数　进行状态机的初始化*/
+    
+    /*进行状态机的初始化*/
     init();
 }
 
@@ -133,6 +141,7 @@ http_conn::LINE_STATUS http_conn::parse_line()
     return LINE_OPEN;
 }
 
+/*循环读取客户数据 直到对方关闭或无数据可读*/
 bool http_conn::read()
 {
     if( m_read_idx >= READ_BUFFER_SIZE )
@@ -162,6 +171,7 @@ bool http_conn::read()
     return true;
 }
 
+/*解析HTTP请求行，获得请求方法，目标url,以及HTTP版本号*/
 http_conn::HTTP_CODE http_conn::parse_request_line( char* text )
 {
     m_url = strpbrk( text, " \t" );
@@ -267,7 +277,7 @@ http_conn::HTTP_CODE http_conn::parse_content( char* text )
     return NO_REQUEST;
 }
 
-/*解析HTTP请求*/
+/*主状态机*/
 http_conn::HTTP_CODE http_conn::process_read()
 {
     LINE_STATUS line_status = LINE_OK;
@@ -325,9 +335,11 @@ http_conn::HTTP_CODE http_conn::process_read()
     return NO_REQUEST;
 }
 
-/*当得到一个完整的正确的http请求时 我们就去分析目标文件的属性
-* 如果目标文件存在　对所有用户可读则使用mmap将其映射到内存地址m_file_address处
-* 并告诉调用者读取成功*/
+/**
+ * 当得到一个完整的正确的http请求时 我们就去分析目标文件的属性
+ * 如果目标文件存在　对所有用户可读则使用mmap将其映射到内存地址
+ * m_file_address处并告诉调用者读取成功。
+ */
 http_conn::HTTP_CODE http_conn::do_request()
 {
     strcpy( m_real_file, doc_root );
@@ -355,20 +367,25 @@ http_conn::HTTP_CODE http_conn::do_request()
         send_to_mycgi();
     }
     
-
     int fd = open( m_real_file, O_RDONLY );
 
     /*起始地址(默认NULL) 指定内存段长度 内存段的访问权限 控制内存段内容被修改后程序的行为　被映射的文件描述符　从何处开始映射*/
     m_file_address = ( char* )mmap( NULL, m_file_stat.st_size, PROT_READ, MAP_PRIVATE, fd, 0 );
-    /*此处应该检测是否分配成功*/
 
+    /**
+     * 这个有被问到过，我当时没听清问题，理解成了关闭之后是否会解除映射关系，不会
+     * 此时数据已经被映射进内存了，关闭套接字不会有影响，但至于为什么之后还能落盘成功
+     * 我猜是因为内核处理脏页了
+     * 
+     * 但是此处，我只是读而已，关闭了没有影响。
+     */
     close( fd );
     return FILE_REQUEST;
 }
 
-/*
+/**
  * 由于本项目侧重于网络方面以及性能的提升
- * 顾对cgi的交互处理的不是很严格 仅采用　/r/n协议
+ * 故对cgi的交互处理的不是很严格 仅采用　/r/n协议
  * 但也是基于fastcgi的思想　即通过socket进行数据交互
  * 详情请参考
  * http://www.php-internals.com/book/?p=chapt02/02-02-03-fastcgi
@@ -426,15 +443,16 @@ bool http_conn::write()
         return true;
     }
 
-    while( 1 )
+    while( true )
     {
         temp = writev( m_sockfd, m_iv, m_iv_count );
         if ( temp <= -1 )
         {
-            /* 如果TCP写缓冲没有空间　则等待下一轮EPOLLOUT事件
+            /** 
+             * 如果TCP写缓冲没有空间　则等待下一轮EPOLLOUT事件
              * 虽然在此期间服务器无法立即接受到同一客户的下一个请求
-             * 但是这可以保证连接的完整性*/
-
+             * 但是这可以保证连接的完整性
+             */
             if( errno == EAGAIN )
             {
                 modfd( m_epollfd, m_sockfd, EPOLLOUT );
@@ -464,6 +482,7 @@ bool http_conn::write()
     }
 }
 
+/*下边几个函数都是一些相应结构的组织*/
 bool http_conn::add_response( const char* format, ... )
 {
     if( m_write_idx >= WRITE_BUFFER_SIZE )
@@ -594,12 +613,10 @@ bool http_conn::process_write( HTTP_CODE ret )
     return true;
 }
 
-/*由线程池内的工作线程调用　这里是处理http请求的入口*/
+/*由线程池内的工作线程调用　处理http请求的入口*/
 void http_conn::process()
 {
-    //先处理read
-    //
-    //HTTP_CODE 服务处理的请求的可能结果
+    /* 先处理read */
     HTTP_CODE read_ret = process_read();
     if ( read_ret == NO_REQUEST )
     {
@@ -615,4 +632,3 @@ void http_conn::process()
 
     modfd( m_epollfd, m_sockfd, EPOLLOUT );
 }
-
