@@ -1,3 +1,9 @@
+/**
+ * Created by 刘嘉辉 on 10/21/18.
+ * Copyright (c) 2018 刘嘉辉 All rights reserved.
+ * @brief To immplmente process_pool.h.
+ */
+
 #ifndef HTTPCONNECTION_H
 #define HTTPCONNECTION_H
 
@@ -95,22 +101,20 @@ private:
     /*初始化cgi*/
     int cgi = 1;
 
-    /**/
+    /*读缓冲区*/
     char m_read_buf[ READ_BUFFER_SIZE ];
-    
-    /**/
+    /*标识度缓冲区中已经读入的客户数据的最后一个字节的的下一个位置*/
     int m_read_idx;
-    /**/
+    /*当前正在分析的字符在读缓冲区的位置*/
     int m_checked_idx;
-    /**/
+    /*当前正在解析的行的起始位置*/
     int m_start_line;
-    /**/
+    /*写缓冲区*/
     char m_write_buf[ WRITE_BUFFER_SIZE ];
-    /**/
     int m_write_idx;
 
     CHECK_STATE m_check_state;
-    /**/
+    /*请求方法*/
     METHOD m_method;
 
     /*客户请求的目标文件的完整路径其内容等于doc_root + m_url, doc_root是网站根目录*/
@@ -130,7 +134,7 @@ private:
     struct stat m_file_stat;
     /*writev执行写操作 便于集中写*/
     struct iovec m_iv[2];
-    /**/
+    /*数量*/
     int m_iv_count;
 };
 
