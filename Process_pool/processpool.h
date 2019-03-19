@@ -1,3 +1,9 @@
+/**
+ * Created by 刘嘉辉 on 10/2/18.
+ * Copyright (c) 2018 刘嘉辉 All rights reserved.
+ * @brief To immplmente process_pool.h.
+ */
+
 #ifndef PROCESSPOOL_H
 #define PROCESSPOOL_H
 
@@ -32,13 +38,13 @@ public:
     int m_pipefd[2];
 };
 
-/*进程池类
- *其模板参数是处理逻辑任务的类
- **/
+/**
+ * 进程池类
+ * 其模板参数是处理逻辑任务的类
+ */
 template< typename T >
 class processpool
 {
-    /*将构造函数定义为私有的　因此我们只能通过后边的create静态*/
 private:
     processpool( int listenfd, int process_number = 8 );
 
@@ -89,13 +95,10 @@ private:
     static processpool< T >* m_instance;
 };
 
-
-
 template< typename T >
 processpool< T >* processpool< T >::m_instance = NULL;
 
-/*用于处理信号的管道　实现统一信号源
-* 全局 */
+/*用于处理信号的管道　实现统一信号源*/
 static int sig_pipefd[2];
 
 static int setnonblocking( int fd )
@@ -109,6 +112,7 @@ static int setnonblocking( int fd )
 static void addfd( int epollfd, int fd )
 {
     epoll_event event;
+    aw
     event.data.fd = fd;
     event.events = EPOLLIN | EPOLLET;
     epoll_ctl( epollfd, EPOLL_CTL_ADD, fd, &event );
@@ -177,9 +181,11 @@ processpool< T >::processpool( int listenfd, int process_number )
 }
 
 
-/*统一事件源*
+/**
+ * 统一事件源
  * 每一个子进程都会拥有一次 sig_pipefd
-　父子进程都做一次*/
+ * 父子进程都做一次
+ */
 template< typename T >
 void processpool< T >::setup_sig_pipe()
 {
@@ -211,8 +217,7 @@ void processpool< T >::run()
     run_parent();
 }
 
-
-/*子进程运行*/
+/*子进程*/
 template< typename T >
 void processpool< T >::run_child()
 {
@@ -293,12 +298,8 @@ void processpool< T >::run_child()
                     {
                         switch( signals[i] )
                         {
-                            /*子进程不需要处理这个child新号*/
-                            case SIGCHLD:
-                            case SIGTERM:
                             case SIGINT:
                             {
-                                printf("子进程也受到啦\n");
                                 m_stop = true;
                                 break;
                             }
@@ -326,7 +327,7 @@ void processpool< T >::run_child()
     delete [] users;
     users = NULL;
     close( pipefd );
-    //close( m_listenfd );
+    close( m_listenfd );
     close( m_epollfd );
 }
 
@@ -379,7 +380,7 @@ void processpool< T >::run_parent()
                 
                 sub_process_counter = (i+1)%m_process_number;
                 
-                /*主进程发送信息通知紫禁城接受连接*/
+                /*主进程发送信息通知子进程接受连接*/
                 send( m_sub_process[i].m_pipefd[0], ( char* )&new_conn, sizeof( new_conn ), 0 );
                 
                 printf( "send request to child %d\n", i );
@@ -401,7 +402,7 @@ void processpool< T >::run_parent()
                     {
                         switch( signals[i] )
                         {
-                            /*第i个子进程退出了　则主进程关闭相应的通信管道并设置m_pid为-1 已标记子进程已退出*/
+                            /*第i个子进程退出了　则主进程关闭相应的通信管道并设置m_pid为-1，标记子进程已退出*/
                             case SIGCHLD:
                             {
                                 pid_t pid;
@@ -429,9 +430,7 @@ void processpool< T >::run_parent()
                                 }
                                 break;
                             }
-                            case SIGTERM:
-                            /*父进程终止信号　杀死所有子进程并等待救赎　
-                            * 更好的方式是向父子进程的通信管道发送特殊数据*/
+                            /*父进程终止信号　杀死所有子进程并等待救赎 更好的方式是向父子进程的通信管道发送特殊数据*/
                             case SIGINT:
                             {
                                 printf( "kill all the clild now\n" );
@@ -460,7 +459,7 @@ void processpool< T >::run_parent()
         }
     }
 
-    /*由创建者关闭*/
+    /*关闭*/
     close( m_epollfd );
 }
 
