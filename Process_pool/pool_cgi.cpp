@@ -1,3 +1,9 @@
+/**
+ * Created by 刘嘉辉 on 10/16/18.
+ * Copyright (c) 2018 刘嘉辉 All rights reserved.
+ * @brief To immplmente pool cgi.
+ */
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -23,7 +29,8 @@ class cgi_conn
 public:
     cgi_conn(){}
     ~cgi_conn(){}
-    //初始化客户端连接，清空该缓冲区
+
+    /*初始化客户端连接，清空该缓冲区*/
     void init(int epollfd, int sockfd, const sockaddr_in& client_addr)
     {
         m_epollfd = epollfd;
@@ -32,14 +39,14 @@ public:
         memset(m_buf, '\0', BUFFER_SIZE);
         m_read_idx = 0;
     }
-    /*
-     * 从m_sockfd读入信息，并进行处理
-     */
+
+    /*从m_sockfd读入信息，并进行处理*/
     void process()
     {
         int idx = 0;
         int ret = -1;
-        //循环读取和分析客户的数据
+
+        /*循环读取和分析客户的数据*/
         while(true)
         {
             idx = m_read_idx;
@@ -52,7 +59,8 @@ public:
                     removefd(m_epollfd, m_sockfd);
                 }
             }
-            //如果对方关闭链接，服务器端也关闭
+
+            /*如果对方关闭链接，服务器端也关闭*/
             else if(ret == 0)
             {
                 removefd(m_epollfd, m_sockfd);
@@ -70,7 +78,8 @@ public:
                         break;
                     }
                 }
-                //如果没有遇到字符 \r\n 就读取更多数据
+
+                /*如果没有遇到字符 \r\n 就读取更多数据*/
                 if(idx == m_read_idx)
                 {
                     continue;
@@ -93,7 +102,7 @@ public:
                     removefd(m_epollfd,m_sockfd);
                     break;
                 }
-                //父进程
+                /*父进程*/
                 else if(ret > 0)
                 {
                     /*因为父进程并不处理这件事，子进程会共享m_epollfd*/
@@ -105,20 +114,18 @@ public:
                     /*子进程将标准输出定向到m_sockfd,并执行CGI程序*/
                     close(1);
                     close(2);
-                    /*
+                    /**
                      * 不继承原有的文件描述符属性　close-on-exec non-blocking
                      * 返回一个最小的文件描述符与原来具有相同所指
                      * 已关闭的STDERR_FILENO是１ 所以　execl 本来要发向1 然后就发到了m_socked那里去
                      */
                     dup(m_sockfd);
-                    /*
+                    /**
                      * execl()用来执行参数path 字符串所代表的文件路径, 
                      * 接下来的参数代表执行该文件时传递过去的argv(0),argv[1], ..., 
                      * 最后一个参数必须用空指针(NULL)作结束.
                      * 示例 execl("/bin/ls", "ls", NULL);
                      */
-                    
-                   // execl(m_buf, "sl", NULL);
                     execl(m_buf, "ls", NULL);
                     exit(0);
                 }
@@ -127,14 +134,14 @@ public:
     }
 
 private:
-    //读缓冲区大小
+    /*读缓冲区大小*/
     static const int BUFFER_SIZE = 1024;
     static int m_epollfd;
     int m_sockfd;
     sockaddr_in m_address;
     char m_buf[ BUFFER_SIZE ];
 
-    //标记缓冲区下一个要读入的位置
+    /*标记缓冲区下一个要读入的位置*/
     int m_read_idx;
 };
 
@@ -178,6 +185,3 @@ int main(int argc, char* argv[])
 
     return 0;
 }
-
-
-
